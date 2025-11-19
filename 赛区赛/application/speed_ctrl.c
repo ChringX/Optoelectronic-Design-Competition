@@ -1,0 +1,65 @@
+#include "speed_ctrl.h"
+#include "motor_task.h"
+#include "pid.h"
+
+volatile struct Motors motor_all = {
+	.Lspeed = 0,
+	.Rspeed = 0,
+	.encoder_avg = 0,
+	.GyroG_speedMax = 50,  //自平衡左右偏差最大值
+	.GyroT_speedMax = 10000,//自转最大速度
+	.Cincrement = 25,	//循迹加速度
+	.Gincrement = 25,		//非循迹加速度
+	.smallGyroT_speedMax = 10000,
+	
+	.is_UP = false,
+	.is_DOWM = false,
+};
+
+struct Gradual TC_speed = {0,0,0}, TG_speed = {0,0,0},TP_speed={0,0,0};
+
+
+void CarBrake(void)
+{
+	pid_mode_switch(is_No);
+	motor_all.Lspeed = motor_all.Rspeed = 0;
+}
+
+//以一次函数缓慢加速或者缓慢停止
+void gradual_cal(struct Gradual *gradual, float target, float increment)
+{
+	uint8_t direction = 0;
+	
+	if(target - gradual->Now < 0)//减速
+		direction = 0;
+	else
+		direction = 1;
+	
+	if(gradual->Now != target)
+	{
+		if (direction)
+			gradual->Now += increment;
+		else
+			gradual->Now -= increment;
+	}
+	else 
+	{	
+		return;
+	}
+	
+	if(direction == 1)//加速
+	{
+		if(gradual->Now > target)
+		{
+			gradual->Now = target;
+		}
+	}
+	else if(direction == 0)
+	{
+		if(gradual->Now < target)//速度小于目标速度
+		{
+			gradual->Now = target;
+		}
+	}
+}
+
